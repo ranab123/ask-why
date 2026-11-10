@@ -1,0 +1,33 @@
+[project]
+name = "askwhy"
+version = "0.1.0"
+description = "Learning from work by asking why: budgeted rationale elicitation for web agents on WorkArena++"
+requires-python = ">=3.12"
+dependencies = [
+  "browsergym-workarena==0.5.3",  # tested version (pulls in browsergym-core, playwright, huggingface-hub)
+  "openai>=1.0",
+  "fastapi",
+  "uvicorn",
+  "pydantic>=2",
+  "pillow",
+  "rich",
+  "typer",
+  "python-dotenv",
+  "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+askwhy = "askwhy.runner:app"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["askwhy*"]
+
+[tool.setuptools.package-data]
+askwhy = ["prompts/*", "panel/static/*"]

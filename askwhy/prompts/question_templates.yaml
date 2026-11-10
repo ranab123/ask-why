@@ -1,0 +1,16 @@
+# question_focus -> TaskNet-style follow-up template. {prediction} = the observer's top predicted action.
+S:
+  id: why_not_alternative
+  text: "Why this record / choice rather than {prediction}?"
+U:
+  id: what_goal
+  text: "What were you trying to accomplish with this step?"
+A:
+  id: which_rule
+  text: "What rule or piece of information determined this choice?"
+N:
+  id: what_goal
+  text: "What were you trying to accomplish with this step?"
+C:
+  id: rule_and_differ
+  text: "What rule determined this action, and when would you have acted differently?"

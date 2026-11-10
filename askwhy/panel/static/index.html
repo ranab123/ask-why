@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ask-Why</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#0b1020; --card:#141b2f; --line:#263050; --fg:#e8ecf7; --mute:#8d97b8; --acc:#ffd166; --ok:#58d68d; --bad:#ff6b6b;
+          --S:#f78fb3; --U:#c56cf0; --A:#f5cd79; --N:#63cdda; --C:#ff793f; --R:#596275; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font: 16px/1.4 -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; }
+  header { padding:14px 18px 10px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:2; }
+  h1 { margin:0 0 6px; font-size:20px; letter-spacing:.3px; }
+  h1 span { color:var(--acc); }
+  .pills { display:flex; flex-wrap:wrap; gap:6px; }
+  .pill { background:var(--card); border:1px solid var(--line); border-radius:999px; padding:3px 10px; font-size:13px; color:var(--mute); }
+  .pill b { color:var(--fg); font-weight:600; }
+  .budget { font-size:20px; letter-spacing:3px; color:var(--acc); }
+  #status { padding:10px 18px; font-size:15px; color:var(--mute); border-bottom:1px solid var(--line); min-height:40px; }
+  #status.paused { color:var(--acc); font-weight:600; animation: blink 1.2s infinite; }
+  @keyframes blink { 50% { opacity:.55; } }
+  #ticket { margin:10px 18px; padding:10px 12px; background:var(--card); border:1px solid var(--line); border-radius:10px; font-size:13px; color:var(--mute); max-height:110px; overflow:auto; white-space:pre-wrap; }
+  #q { margin:10px 18px; padding:14px; background:#1e2541; border:2px solid var(--acc); border-radius:12px; display:none; }
+  #q.show { display:block; }
+  #q .qtext { font-size:18px; font-weight:600; color:var(--acc); margin-bottom:8px; }
+  #q .field { margin:6px 0; font-size:15px; }
+  #q .field b { color:var(--mute); font-weight:600; display:inline-block; width:110px; }
+  #q .wait { color:var(--mute); font-style:italic; }
+  #steps { padding:6px 18px 60px; }
+  .step { display:grid; grid-template-columns: 36px 1fr; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); }
+  .step .t { color:var(--mute); font-variant-numeric: tabular-nums; }
+  .step .label { font-size:13px; color:var(--mute); }
+  .step .action { font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .step.fired .action::before { content:"⚡ "; }
+  .step.fired { background:linear-gradient(90deg, rgba(255,209,102,.12), transparent); }
+  .bar { position:relative; height:10px; background:#0f1528; border-radius:5px; margin-top:6px; overflow:visible; display:flex; }
+  .bar i { display:block; height:100%; }
+  .bar .S{background:var(--S)} .bar .U{background:var(--U)} .bar .A{background:var(--A)} .bar .N{background:var(--N)} .bar .C{background:var(--C)}
+  .bar .tau { position:absolute; top:-3px; width:2px; height:16px; background:#fff; opacity:.8; }
+  .bar .g { position:absolute; top:-18px; font-size:11px; color:var(--mute); transform:translateX(-50%); }
+  .legend { font-size:12px; color:var(--mute); display:flex; gap:10px; margin:6px 18px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:middle; }
+  .err { color:var(--bad); font-size:12px; }
+  .obs { font-size:13px; color:#b9c2e0; margin-top:4px; } .obs .conf { color:var(--mute); }
+  .step.decision .t { color:var(--acc); font-weight:700; }
+  footer { position:fixed; bottom:0; left:0; right:0; padding:8px 18px; background:var(--bg); border-top:1px solid var(--line); font-size:13px; color:var(--mute); display:flex; gap:16px; }
+  .done { color:var(--ok); font-weight:600; } .fail { color:var(--bad); font-weight:600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ask<span>-Why</span> <small style="color:var(--mute);font-weight:400;font-size:13px">budgeted question selection</small></h1>
+  <div class="pills" id="pills"><span class="pill">waiting for run…</span></div>
+</header>
+<div id="status">idle</div>
+<div id="ticket" style="display:none"></div>
+<div id="q"></div>
+<div class="legend"><span><i style="background:var(--S)"></i>surprise</span><span><i style="background:var(--U)"></i>uncertainty</span><span><i style="background:var(--A)"></i>ambiguity</span><span><i style="background:var(--N)"></i>novelty</span><span><i style="background:var(--C)"></i>criticality</span><span>| = threshold τ</span></div>
+<div id="steps"></div>
+<footer><span id="f-live">● connecting</span><span id="f-steps">steps: 0</span><span id="f-q">questions: 0</span><span id="f-cost">cost: $0.000</span><span id="f-time"></span></footer>
+
+<script>
+let since = 0, run = {}, budgetLeft = 0, nq = 0, nsteps = 0, t0 = null, lam = {S:.25,U:.2,A:.15,N:.1,C:.3};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function pills() {
+  const dots = '●'.repeat(budgetLeft) + '○'.repeat(Math.max(0, (run.budget||0) - budgetLeft));
+  $('#pills').innerHTML = `
+    <span class="pill">task <b>${esc(run.task)}</b></span>
+    <span class="pill">seed <b>${esc(run.seed)}</b></span>
+    <span class="pill">mode <b>${esc(run.mode)}</b></span>
+    <span class="pill">selector <b>${esc(run.selector)}</b></span>
+    <span class="pill">model <b>${esc(run.model)}</b></span>
+    <span class="pill">budget <span class="budget">${dots}</span></span>`;
+}
+function status(txt, paused) { const s = $('#status'); s.textContent = txt; s.className = paused ? 'paused' : ''; }
+
+function handle(e) {
+  if (e.event === 'run_start') { run = e; budgetLeft = e.budget; t0 = e.ts; pills(); status('starting…');
+    if (e.ticket) { $('#ticket').style.display='block'; $('#ticket').textContent = 'Ticket: ' + e.ticket; } }
+  else if (e.event === 'status') status(e.text, /PAUSED/.test(e.text));
+  else if (e.event === 'step_start') status(`step ${e.t} · ${e.page_sig}`);
+  else if (e.event === 'scored') {
+    nsteps = e.t + 1; const s = e.selector || {};
+    const w = k => Math.round(100 * (lam[k] || 0) * (s[k] || 0));
+    const div = document.createElement('div');
+    div.className = 'step' + (s.fire ? ' fired' : '') + (s.is_decision ? ' decision' : ''); div.id = 'step-' + e.t;
+    div.innerHTML = `<div class="t">${e.t}</div><div>
+        <div class="label">${esc(e.label)}${e.boundary ? ' · <span style="color:var(--N)">new segment</span>' : ''}</div>
+        <div class="action" title="${esc(e.action)}">${esc(e.action)}</div>
+        <div class="bar"><i class="S" style="width:${w('S')}%"></i><i class="U" style="width:${w('U')}%"></i><i class="A" style="width:${w('A')}%"></i><i class="N" style="width:${w('N')}%"></i><i class="C" style="width:${w('C')}%"></i>
+          <span class="tau" style="left:${Math.round(100*(s.tau||0))}%"></span><span class="g" style="left:${Math.round(100*(s.g||0))}%">g=${(s.g||0).toFixed(2)}</span></div>
+        ${e.observer ? `<div class="obs">🧠 ${esc(e.observer.rationale)} <span class="conf">conf ${(e.observer.confidence||0).toFixed(1)}${(e.observer.alternatives||[]).length ? ' · ' + e.observer.alternatives.length + ' alt.' : ''}</span></div>` : ''}
+        <div class="err" id="err-${e.t}"></div></div>`;
+    $('#steps').prepend(div);
+    $('#f-steps').textContent = 'steps: ' + nsteps;
+  }
+  else if (e.event === 'question_asked') { budgetLeft = e.budget_left; pills(); status('PAUSED — asking why', true);
+    $('#q').className = 'show'; $('#q').innerHTML = `<div class="qtext">❓ ${esc(e.question)}</div><div class="wait">waiting for answer… (focus: ${esc(e.focus)})</div>`; }
+  else if (e.event === 'question_answered') { nq++; $('#f-q').textContent = 'questions: ' + nq; const a = e.answer || {};
+    $('#q').innerHTML = $('#q').querySelector('.qtext').outerHTML +
+      `<div class="field"><b>goal</b>${esc(a.goal)}</div><div class="field"><b>evidence</b>${esc(a.evidence)}</div>
+       <div class="field"><b>alternatives</b>${esc(a.alternatives)}</div><div class="field"><b>would differ</b>${esc(a.would_differ)}</div>`; }
+  else if (e.event === 'step_done') { if (e.error) { const el = $('#err-' + e.t); if (el) el.textContent = 'error: ' + e.error; } }
+  else if (e.event === 'run_end') { status(e.success ? '✅ task completed' : '❌ run ended without success'); $('#status').className = e.success ? 'done' : 'fail';
+    $('#f-cost').textContent = 'cost: $' + (e.cost || 0).toFixed(3); }
+  if (e.ts && t0) $('#f-time').textContent = 'elapsed: ' + Math.round(e.ts - t0) + 's';
+}
+async function poll() {
+  try {
+    const r = await fetch('/state?since=' + since, {cache: 'no-store'}); const d = await r.json();
+    if (d.total < since) { location.reload(); return; }  // server restarted (new run): start over
+    d.events.forEach(e => { try { handle(e); } catch (err) { console.error(err); } }); since = d.total;
+    const lv = $('#f-live'); lv.textContent = '● live'; lv.style.color = 'var(--ok)';
+  } catch (_) { const lv = $('#f-live'); lv.textContent = '● disconnected'; lv.style.color = 'var(--bad)'; }
+  setTimeout(poll, 300);
+}
+poll();
+</script>
+</body>
+</html>
