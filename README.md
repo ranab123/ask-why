@@ -108,7 +108,7 @@ The midway report contains no student-training results yet. What it reports, and
 | Reported | Command | What you should see |
 |---|---|---|
 | Gate and export unit tests | `pytest` | 11 tests pass (no browser, keys or network needed) |
-| Pipeline test with WorkArena's scripted solver | `python -m askwhy run --mode oracle` | the scripted solver completes the task in 9 sub-steps; the observer and gate run on top and ask up to 2 questions; cost about $0.01 |
+| Pipeline test with WorkArena's scripted solver | `python -m askwhy run --mode oracle` | the scripted solver completes the task in 9 sub-steps; the observer and gate run on top and ask up to 2 questions; cost about $0.02 |
 | A teacher demonstration with questions | `python -m askwhy run --panel` | the teacher works through the ticket; up to 2 questions asked and answered. Our reference run: solved in 17 steps, 2 questions, $1.21 |
 | Paired export | `python -m askwhy.export runs/<run_id>` | `export/action_only.jsonl` and `export/rationale.jsonl`, one line per step, identical actions |
 
